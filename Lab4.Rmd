@@ -1,0 +1,162 @@
+---
+title: "Lab 4.R"
+author: "Carson Dobozy"
+date: "3/30/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(kernlab)
+library(caret)
+data("spam")
+tibble::as.tibble(spam)
+is.factor(spam$type)
+levels(spam$type)
+data = read.csv('https://msudataanalytics.github.io/SSC442/Labs/data/bank.csv', header = TRUE)
+
+```
+
+
+```{r}
+#train and test data
+set.seed(42)
+spam_idx = sample(nrow(spam), round(nrow(spam) / 2))
+spam_idx = sample(nrow(spam), 1000)
+spam_trn = spam[spam_idx, ]
+spam_tst = spam[-spam_idx, ]
+```
+
+```{r}
+fit_caps = glm(type ~ capitalTotal,
+               data = spam_trn, family = binomial)
+fit_selected = glm(type ~ edu + money + capitalTotal + charDollar,
+                   data = spam_trn, family = binomial)
+fit_additive = glm(type ~ .,
+                   data = spam_trn, family = binomial)
+fit_over = glm(type ~ capitalTotal * (.),
+               data = spam_trn, family = binomial, maxit = 50)
+
+```
+
+```{r}
+# training misclassification rate
+mean(ifelse(predict(fit_caps) > 0, "spam", "nonspam") != spam_trn$type)
+mean(ifelse(predict(fit_selected) > 0, "spam", "nonspam") != spam_trn$type)
+mean(ifelse(predict(fit_additive) > 0, "spam", "nonspam") != spam_trn$type)
+mean(ifelse(predict(fit_over) > 0, "spam", "nonspam") != spam_trn$type)
+
+```
+
+
+```{r}
+library(boot)
+set.seed(1)
+#numbered from least to most fitted
+num4 = cv.glm(spam_trn, fit_caps, K = 5)$delta[1]
+num3 = cv.glm(spam_trn, fit_selected, K = 5)$delta[1]
+num1 = cv.glm(spam_trn, fit_additive, K = 5)$delta[1]
+num2 = cv.glm(spam_trn, fit_over, K = 5)$delta[1]
+
+```
+
+```{r}
+#Exercise 1 part 1
+set.seed(10)
+num_4 = cv.glm(spam_trn, fit_caps, K = 100)$delta[1]
+num_3 = cv.glm(spam_trn, fit_selected, K = 100)$delta[1]
+num_1 = cv.glm(spam_trn, fit_additive, K = 100)$delta[1]
+num_2 = cv.glm(spam_trn, fit_over, K = 100)$delta[1]
+#at 100 folds our order from least to most fitted does not change but the numbers do slightly differ
+```
+
+```{r}
+make_conf_mat = function(predicted, actual) {
+  table(predicted = predicted, actual = actual)
+}
+
+spam_tst_pred = ifelse(predict(fit_additive, spam_tst) > 0,
+                       "spam",
+                       "nonspam")
+spam_tst_pred = ifelse(predict(fit_additive, spam_tst, type = "response") > 0.5,
+                       "spam",
+                       "nonspam")
+
+(conf_mat_50 = make_conf_mat(predicted = spam_tst_pred, actual = spam_tst$type))
+
+table(spam_tst$type) / nrow(spam_tst)
+
+```
+
+
+```{r}
+#Exercise 1 Part 2 
+
+spam_tst.pred = ifelse(predict(fit_additive, spam_tst) > 0, "spam", "nonspam")
+spam_tst.caps = ifelse(predict(fit_caps, spam_tst) >0 , "spam", "nonspam")
+spam_tst.over = ifelse(predict(fit_over, spam_tst) >0 , "spam", "nonspam")
+spam_tst.select = ifelse(predict(fit_selected, spam_tst) >0 , "spam", "nonspam")
+
+
+
+pred_matx = make_conf_mat(predicted = spam_tst.pred, actual = spam_tst$type)
+caps_matx = make_conf_mat(predicted = spam_tst.caps, actual = spam_tst$type)
+over_matx = make_conf_mat(predicted = spam_tst.over, actual = spam_tst$type)
+select_matx = make_conf_mat(predicted = spam_tst.select, actual = spam_tst$type)
+
+pred_matx
+caps_matx
+over_matx
+select_matx
+
+```
+
+```{r}
+#Exercise 2 
+#Train and tes bank data
+tibble::as.tibble(data)
+is.factor(data$y)
+levels(data$y)
+
+set.seed(20)
+data_x = sample(nrow(data), round(nrow(data)/2))
+data_trn = data[data_x, ]
+data_tst = data[-data_x, ]
+
+```
+
+```{r}
+#Run Regression
+fit_caps2 = glm(y ~ balance, data = data_trn, family = binomial)
+fit_selected2 = glm(y ~ age + education + balance+ default, data = data_trn, family = binomial)
+fit_additive2 = glm(y ~ ., data= data_trn, family = binomial)
+fit_over2 = glm(y ~ balance * (.), data = data_trn, family = binomial, maxit = 50)
+
+#10 fold cross validation
+set.seed(10)
+cv.glm(data_trn, fit_caps2, K = 10)$delta[1]
+cv.glm(data_trn, fit_selected2, K = 10)$delta[1]
+cv.glm(data_trn, fit_additive2, K = 10)$delta[1]
+cv.glm(data_trn, fit_over2, K = 10)$delta[1]
+```
+
+```{r}
+pred = predict(fit_selected2,newdata = data_tst, type = "response")
+
+x = table(data_tst$y, predict(fit_selected2,newdata = data_tst, type = "response")>0.15)
+x
+
+```
+
+
+
+
+
+
+
+
+
+
